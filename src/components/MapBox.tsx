@@ -11,8 +11,10 @@ mapboxgl.accessToken =
   process.env.NEXT_PUBLIC_MAPBOX_TOKEN ||
   "pk.eyJ1IjoiZXhhbXBsZSIsImEiOiJjbGV4YW1wbGUifQ.example";
 
+import { RouteResult } from "@/lib/mapbox";
+
 interface MapBoxProps {
-  routeData?: GeoJSON.FeatureCollection;
+  routeData?: RouteResult;
   isLoading?: boolean;
 }
 
@@ -20,6 +22,61 @@ export function MapBox({ routeData, isLoading = false }: MapBoxProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [userLocation, setUserLocation] = useState<[number, number]>([
+    15.3369, -4.3317,
+  ]);
+
+  useEffect(() => {
+    // Obtenir la position de l'utilisateur avec haute précision
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude, accuracy } = position.coords;
+          console.log(`Position obtenue - Précision: ${accuracy}m`);
+          setUserLocation([longitude, latitude]);
+        },
+        (error) => {
+          console.warn(
+            "Géolocalisation échouée, utilisation de Kinshasa par défaut:",
+            error
+          );
+          // Garde la position par défaut de Kinshasa
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 15000, // Augmenté à 15 secondes
+          maximumAge: 60000, // Réduit à 1 minute pour plus de fraîcheur
+        }
+      );
+
+      // Optionnel : Surveillance continue de la position
+      const watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          const { latitude, longitude, accuracy } = position.coords;
+          console.log(`Position mise à jour - Précision: ${accuracy}m`);
+          if (accuracy < 100) {
+            // Seulement si précision < 100m
+            setUserLocation([longitude, latitude]);
+          }
+        },
+        (error) => {
+          console.warn("Erreur de surveillance de position:", error);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 30000, // 30 secondes
+        }
+      );
+
+      // Nettoyage
+      return () => {
+        if (watchId) {
+          navigator.geolocation.clearWatch(watchId);
+        }
+      };
+    }
+  }, []);
 
   useEffect(() => {
     if (!mapContainer.current) return;
@@ -27,12 +84,15 @@ export function MapBox({ routeData, isLoading = false }: MapBoxProps) {
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: "mapbox://styles/mapbox/streets-v12",
-      center: [2.3522, 48.8566], // Paris par défaut
-      zoom: 10,
+      center: userLocation,
+      zoom: 15,
     });
 
     map.current.on("load", () => {
       setMapLoaded(true);
+
+      // Ajouter le marqueur de position utilisateur
+      addUserLocationMarker();
     });
 
     return () => {
@@ -40,10 +100,80 @@ export function MapBox({ routeData, isLoading = false }: MapBoxProps) {
         map.current.remove();
       }
     };
-  }, []);
+  }, [userLocation]);
+
+  const addUserLocationMarker = () => {
+    if (!map.current || !mapLoaded) return;
+
+    // Supprimer le marqueur existant s'il existe
+    if (map.current.getSource("user-location")) {
+      map.current.removeLayer("user-location");
+      map.current.removeSource("user-location");
+    }
+
+    // Ajouter la source pour la position utilisateur
+    map.current.addSource("user-location", {
+      type: "geojson",
+      data: {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            geometry: {
+              type: "Point",
+              coordinates: userLocation,
+            },
+            properties: {
+              title: "Votre position",
+            },
+          },
+        ],
+      },
+    });
+
+    // Ajouter le cercle de position (style GPS)
+    map.current.addLayer({
+      id: "user-location",
+      type: "circle",
+      source: "user-location",
+      paint: {
+        "circle-radius": 12,
+        "circle-color": "#007cbf",
+        "circle-stroke-width": 3,
+        "circle-stroke-color": "#ffffff",
+        "circle-opacity": 0.8,
+      },
+    });
+
+    // Ajouter un point central plus petit
+    map.current.addLayer({
+      id: "user-location-dot",
+      type: "circle",
+      source: "user-location",
+      paint: {
+        "circle-radius": 4,
+        "circle-color": "#ffffff",
+        "circle-stroke-width": 0,
+      },
+    });
+  };
+
+  // Mettre à jour le marqueur utilisateur quand la position change
+  useEffect(() => {
+    if (mapLoaded) {
+      addUserLocationMarker();
+    }
+  }, [userLocation, mapLoaded]);
 
   useEffect(() => {
-    if (!map.current || !mapLoaded || !routeData) return;
+    if (
+      !map.current ||
+      !mapLoaded ||
+      !routeData ||
+      !routeData.features ||
+      routeData.features.length === 0
+    )
+      return;
 
     // Supprimer les sources et couches existantes
     if (map.current.getSource("route")) {
@@ -55,81 +185,90 @@ export function MapBox({ routeData, isLoading = false }: MapBoxProps) {
       map.current.removeSource("markers");
     }
 
-    // Ajouter la route
-    map.current.addSource("route", {
-      type: "geojson",
-      data: routeData,
-    });
+    // Garder le marqueur utilisateur visible même avec la route
+    if (!map.current.getSource("user-location")) {
+      addUserLocationMarker();
+    }
 
-    map.current.addLayer({
-      id: "route",
-      type: "line",
-      source: "route",
-      layout: {
-        "line-join": "round",
-        "line-cap": "round",
-      },
-      paint: {
-        "line-color": "#3b82f6",
-        "line-width": 4,
-      },
-    });
+    try {
+      // Ajouter la route
+      map.current.addSource("route", {
+        type: "geojson",
+        data: routeData,
+      });
 
-    // Ajouter les marqueurs
-    const markers: GeoJSON.FeatureCollection = {
-      type: "FeatureCollection",
-      features: [
-        {
-          type: "Feature",
-          geometry: {
-            type: "Point",
-            coordinates: routeData.features[0].geometry.coordinates[0],
-          },
-          properties: {
-            title: "Départ",
-            color: "#10b981",
-          },
+      map.current.addLayer({
+        id: "route",
+        type: "line",
+        source: "route",
+        layout: {
+          "line-join": "round",
+          "line-cap": "round",
         },
-        {
-          type: "Feature",
-          geometry: {
-            type: "Point",
-            coordinates:
-              routeData.features[0].geometry.coordinates[
-                routeData.features[0].geometry.coordinates.length - 1
-              ],
-          },
-          properties: {
-            title: "Arrivée",
-            color: "#ef4444",
-          },
+        paint: {
+          "line-color": "#3b82f6",
+          "line-width": 4,
         },
-      ],
-    };
+      });
 
-    map.current.addSource("markers", {
-      type: "geojson",
-      data: markers,
-    });
+      // Ajouter les marqueurs
+      const routeGeometry = routeData.features[0]
+        .geometry as GeoJSON.LineString;
+      const markers: GeoJSON.FeatureCollection = {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            geometry: {
+              type: "Point",
+              coordinates: routeGeometry.coordinates[0],
+            },
+            properties: {
+              title: "Départ",
+              color: "#10b981",
+            },
+          },
+          {
+            type: "Feature",
+            geometry: {
+              type: "Point",
+              coordinates:
+                routeGeometry.coordinates[routeGeometry.coordinates.length - 1],
+            },
+            properties: {
+              title: "Arrivée",
+              color: "#ef4444",
+            },
+          },
+        ],
+      };
 
-    map.current.addLayer({
-      id: "markers",
-      type: "circle",
-      source: "markers",
-      paint: {
-        "circle-radius": 8,
-        "circle-color": ["get", "color"],
-        "circle-stroke-width": 2,
-        "circle-stroke-color": "#ffffff",
-      },
-    });
+      map.current.addSource("markers", {
+        type: "geojson",
+        data: markers,
+      });
 
-    // Ajuster la vue pour inclure toute la route
-    const bounds = new mapboxgl.LngLatBounds();
-    routeData.features[0].geometry.coordinates.forEach((coord: number[]) => {
-      bounds.extend(coord as [number, number]);
-    });
-    map.current.fitBounds(bounds, { padding: 50 });
+      map.current.addLayer({
+        id: "markers",
+        type: "circle",
+        source: "markers",
+        paint: {
+          "circle-radius": 8,
+          "circle-color": ["get", "color"],
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#ffffff",
+        },
+      });
+
+      // Ajuster la vue pour inclure toute la route
+      const bounds = new mapboxgl.LngLatBounds();
+      routeGeometry.coordinates.forEach((coord: number[]) => {
+        bounds.extend(coord as [number, number]);
+      });
+      map.current.fitBounds(bounds, { padding: 50 });
+    } catch (error) {
+      console.error("Erreur lors de l'affichage de la route:", error);
+    }
   }, [routeData, mapLoaded]);
 
   return (

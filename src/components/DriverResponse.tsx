@@ -24,6 +24,7 @@ interface DriverResponseProps {
   isOpen: boolean;
   onClose: () => void;
   driver?: Driver;
+  estimatedArrivalTime?: number; // Temps d'arrivée estimé en minutes depuis Mapbox
 }
 
 const mockDrivers: Driver[] = [
@@ -57,6 +58,7 @@ export function DriverResponse({
   isOpen,
   onClose,
   driver,
+  estimatedArrivalTime,
 }: DriverResponseProps) {
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [isSearching, setIsSearching] = useState(false);
@@ -68,13 +70,24 @@ export function DriverResponse({
       setTimeout(() => {
         const randomDriver =
           mockDrivers[Math.floor(Math.random() * mockDrivers.length)];
-        setSelectedDriver(randomDriver);
+
+        // Utiliser le temps d'arrivée estimé ou ajouter 3-7 minutes au temps de trajet
+        const arrivalTime = estimatedArrivalTime
+          ? Math.round(estimatedArrivalTime + Math.random() * 4 + 3) // +3 à +7 minutes
+          : randomDriver.eta;
+
+        const driverWithRealETA = {
+          ...randomDriver,
+          eta: arrivalTime,
+        };
+
+        setSelectedDriver(driverWithRealETA);
         setIsSearching(false);
       }, 2000);
     } else if (driver) {
       setSelectedDriver(driver);
     }
-  }, [isOpen, driver]);
+  }, [isOpen, driver, estimatedArrivalTime]);
 
   const handleAccept = () => {
     // Ici vous pourriez ajouter la logique pour accepter le conducteur

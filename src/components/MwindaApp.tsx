@@ -9,7 +9,8 @@ import { saveBooking } from "@/lib/storage";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Car, Map, History } from "lucide-react";
-import { getRoute } from "@/lib/mapbox";
+import { getRoute, RouteResult } from "@/lib/mapbox";
+import { RouteInfo } from "./RouteInfo";
 
 interface Driver {
   name: string;
@@ -25,13 +26,12 @@ interface BookingData {
   phone: string;
   departure: string;
   arrival: string;
+  arrivalCoords?: [number, number];
 }
 
 export function MwindaApp() {
   const [isLoading, setIsLoading] = useState(false);
-  const [routeData, setRouteData] = useState<GeoJSON.FeatureCollection | null>(
-    null
-  );
+  const [routeData, setRouteData] = useState<RouteResult | null>(null);
   const [currentBooking, setCurrentBooking] = useState<BookingData | null>(
     null
   );
@@ -72,17 +72,17 @@ export function MwindaApp() {
     }
   };
 
-  const handleDriverAccept = () => {
-    if (currentBooking && selectedDriver) {
-      // Mettre à jour la réservation avec les infos du conducteur
-      saveBooking({
-        ...currentBooking,
-        driver: selectedDriver,
-      });
-      toast.success("Réservation confirmée !");
-    }
-    setShowDriverResponse(false);
-  };
+  // const handleDriverAccept = () => {
+  //   if (currentBooking && selectedDriver) {
+  //     // Mettre à jour la réservation avec les infos du conducteur
+  //     saveBooking({
+  //       ...currentBooking,
+  //       driver: selectedDriver,
+  //     });
+  //     toast.success("Réservation confirmée !");
+  //   }
+  //   setShowDriverResponse(false);
+  // };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -112,18 +112,25 @@ export function MwindaApp() {
 
           <TabsContent value="booking" className="mt-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div>
+              <div className="space-y-6">
                 <BookingForm
                   onBookingSubmit={handleBookingSubmit}
                   isLoading={isLoading}
                 />
+
+                {/* Afficher les informations d'itinéraire */}
+                {routeData?.routeInfo && (
+                  <RouteInfo
+                    distance={routeData.routeInfo.distance}
+                    mode={routeData.routeInfo.mode}
+                    drivingTime={routeData.routeInfo.drivingTime}
+                  />
+                )}
               </div>
               <div>
                 {currentBooking && (
                   <MapBox
-                    departure={currentBooking.departure}
-                    arrival={currentBooking.arrival}
-                    routeData={routeData}
+                    routeData={routeData || undefined}
                     isLoading={isLoading}
                   />
                 )}
@@ -133,17 +140,26 @@ export function MwindaApp() {
 
           <TabsContent value="map" className="mt-6">
             {currentBooking ? (
-              <MapBox
-                departure={currentBooking.departure}
-                arrival={currentBooking.arrival}
-                routeData={routeData}
-                isLoading={isLoading}
-              />
+              <div className="space-y-6">
+                <MapBox
+                  routeData={routeData || undefined}
+                  isLoading={isLoading}
+                />
+                {/* Afficher les informations d'itinéraire aussi sur l'onglet carte */}
+                {routeData?.routeInfo && (
+                  <RouteInfo
+                    distance={routeData.routeInfo.distance}
+                    mode={routeData.routeInfo.mode}
+                    drivingTime={routeData.routeInfo.drivingTime}
+                  />
+                )}
+              </div>
             ) : (
               <div className="text-center py-12">
                 <Map className="h-16 w-16 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-500">
-                  Effectuez une réservation pour voir l'itinéraire sur la carte
+                  Effectuez une réservation pour voir l&apos;itinéraire sur la
+                  carte
                 </p>
               </div>
             )}
@@ -158,7 +174,12 @@ export function MwindaApp() {
       <DriverResponse
         isOpen={showDriverResponse}
         onClose={() => setShowDriverResponse(false)}
-        driver={selectedDriver}
+        driver={selectedDriver || undefined}
+        estimatedArrivalTime={
+          routeData?.routeInfo?.drivingTime
+            ? Math.round(routeData.routeInfo.drivingTime / 60)
+            : undefined
+        }
       />
     </div>
   );
