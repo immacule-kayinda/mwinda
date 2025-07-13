@@ -1,36 +1,98 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Mwinda - Application de Réservation de Trajet
 
-## Getting Started
+Une application MVP de réservation de trajet type Yango/Uber, construite avec Next.js, TypeScript, et Mapbox.
 
-First, run the development server:
+## Fonctionnalités
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- ✅ Formulaire de réservation avec validation
+- ✅ Carte interactive Mapbox avec affichage d'itinéraire
+- ✅ Simulation de recherche de conducteur
+- ✅ Historique des trajets avec stockage local
+- ✅ Interface utilisateur moderne avec shadcn/ui
+
+## Installation
+
+1. Clonez le repository
+2. Installez les dépendances :
+   ```bash
+   npm install
+   ```
+
+3. Configurez votre token Mapbox :
+   - Créez un compte sur [Mapbox](https://www.mapbox.com/)
+   - Obtenez votre token d'accès
+   - Créez un fichier `.env.local` à la racine du projet :
+   ```
+   NEXT_PUBLIC_MAPBOX_TOKEN=votre_token_mapbox_ici
+   ```
+
+4. Lancez l'application :
+   ```bash
+   npm run dev
+   ```
+
+## Structure du Projet
+
+```
+src/
+├── app/                    # Pages Next.js
+├── components/             # Composants React
+│   ├── ui/                # Composants shadcn/ui
+│   ├── BookingForm.tsx    # Formulaire de réservation
+│   ├── MapBox.tsx         # Carte interactive
+│   ├── DriverResponse.tsx # Réponse du conducteur
+│   ├── BookingHistory.tsx # Historique des trajets
+│   └── MwindaApp.tsx      # Composant principal
+└── lib/                   # Utilitaires
+    ├── mapbox.ts          # Service Mapbox
+    └── storage.ts         # Gestion du stockage local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Utilisation
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. **Réservation** : Remplissez le formulaire avec vos informations et adresses
+2. **Carte** : Visualisez l'itinéraire calculé entre les points
+3. **Conducteur** : Acceptez ou appelez le conducteur simulé
+4. **Historique** : Consultez vos trajets précédents
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Technologies Utilisées
 
-## Learn More
+- **Next.js 15** - Framework React
+- **TypeScript** - Typage statique
+- **Tailwind CSS** - Styling
+- **shadcn/ui** - Composants UI
+- **Mapbox GL JS** - Cartes interactives
+- **React Hook Form** - Gestion de formulaires
+- **Zod** - Validation de schémas
+- **Lucide React** - Icônes
 
-To learn more about Next.js, take a look at the following resources:
+## Configuration Mapbox
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+L'application utilise l'API Mapbox pour :
+- Géocodage des adresses
+- Calcul d'itinéraires
+- Affichage de cartes interactives
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Assurez-vous d'avoir un token Mapbox valide avec les permissions appropriées.
 
-## Deploy on Vercel
+## Développement
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+# Lancer en mode développement
+npm run dev
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Build de production
+npm run build
+
+# Lancer en production
+npm start
+```
+
+## Fonctionnalités Futures
+
+- [ ] Authentification utilisateur
+- [ ] Géolocalisation automatique
+- [ ] Estimation de prix
+- [ ] Notifications push
+- [ ] Paiement intégré
+- [ ] Système de notation
