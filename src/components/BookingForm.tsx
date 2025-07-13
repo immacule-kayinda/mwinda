@@ -240,7 +240,7 @@ export function BookingForm({
           <div className="space-y-2">
             <Label htmlFor="arrival">Point d&apos;arrivée</Label>
             <AddressAutocomplete
-              placeholder="Où allez-vous ? (ex: Bandal, Gombe...)"
+              placeholder="Où allez-vous ? (ex: Muanda, Matadi, Kasumbalesa, etc...)"
               value={arrivalValue}
               onChange={handleArrivalChange}
               icon={<MapPin className="h-4 w-4" />}
