@@ -1,14 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 import { BookingForm } from "./BookingForm";
 import { MapBox } from "./MapBox";
 import { DriverResponse } from "./DriverResponse";
 import { BookingHistory } from "./BookingHistory";
-import { saveBooking } from "@/lib/storage";
+import { AuthForm } from "./AuthForm";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Car, Map, History } from "lucide-react";
+import { Car, Map, History, User } from "lucide-react";
 import { getRoute, RouteResult } from "@/lib/mapbox";
 import { RouteInfo } from "./RouteInfo";
 
@@ -30,6 +31,7 @@ interface BookingData {
 }
 
 export function MwindaApp() {
+  const { data: session } = useSession();
   const [isLoading, setIsLoading] = useState(false);
   const [routeData, setRouteData] = useState<RouteResult | null>(null);
   const [currentBooking, setCurrentBooking] = useState<BookingData | null>(
@@ -39,6 +41,11 @@ export function MwindaApp() {
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
 
   const handleBookingSubmit = async (data: BookingData) => {
+    if (!session?.user?.id) {
+      toast.error("Vous devez être connecté pour effectuer une réservation");
+      return;
+    }
+
     setIsLoading(true);
     setCurrentBooking(data);
 
@@ -47,8 +54,32 @@ export function MwindaApp() {
       const route = await getRoute(data.departure, data.arrival);
       setRouteData(route);
 
-      // Sauvegarder la réservation
-      saveBooking(data);
+      // Sauvegarder la réservation dans la base de données
+      const bookingResponse = await fetch("/api/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...data,
+          departureCoords: (
+            route.features[0]?.geometry as GeoJSON.LineString
+          )?.coordinates[0]?.join(","),
+          arrivalCoords: (
+            route.features[0]?.geometry as GeoJSON.LineString
+          )?.coordinates[
+            (route.features[0]?.geometry as GeoJSON.LineString)?.coordinates
+              .length - 1
+          ]?.join(","),
+          distance: route.routeInfo?.distance,
+          duration: route.routeInfo?.drivingTime,
+          price: route.routeInfo?.distance
+            ? Math.round(route.routeInfo.distance * 0.5)
+            : undefined,
+        }),
+      });
+
+      if (!bookingResponse.ok) {
+        throw new Error("Erreur lors de la sauvegarde de la réservation");
+      }
 
       // Simuler la recherche d'un conducteur
       setTimeout(() => {
@@ -72,18 +103,6 @@ export function MwindaApp() {
     }
   };
 
-  // const handleDriverAccept = () => {
-  //   if (currentBooking && selectedDriver) {
-  //     // Mettre à jour la réservation avec les infos du conducteur
-  //     saveBooking({
-  //       ...currentBooking,
-  //       driver: selectedDriver,
-  //     });
-  //     toast.success("Réservation confirmée !");
-  //   }
-  //   setShowDriverResponse(false);
-  // };
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
@@ -92,10 +111,15 @@ export function MwindaApp() {
           <p className="text-gray-600">
             Votre application de réservation de trajet
           </p>
+          {session?.user?.name && (
+            <p className="text-sm text-gray-500 mt-2">
+              Bienvenue, {session.user.name} !
+            </p>
+          )}
         </div>
 
         <Tabs defaultValue="booking" className="max-w-6xl mx-auto">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="booking" className="flex items-center gap-2">
               <Car className="h-4 w-4" />
               Réserver
@@ -107,6 +131,10 @@ export function MwindaApp() {
             <TabsTrigger value="history" className="flex items-center gap-2">
               <History className="h-4 w-4" />
               Historique
+            </TabsTrigger>
+            <TabsTrigger value="profile" className="flex items-center gap-2">
+              <User className="h-4 w-4" />
+              Profil
             </TabsTrigger>
           </TabsList>
 
@@ -167,6 +195,12 @@ export function MwindaApp() {
 
           <TabsContent value="history" className="mt-6">
             <BookingHistory />
+          </TabsContent>
+
+          <TabsContent value="profile" className="mt-6">
+            <div className="max-w-md mx-auto">
+              <AuthForm />
+            </div>
           </TabsContent>
         </Tabs>
       </div>

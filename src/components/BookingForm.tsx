@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,6 +36,7 @@ export function BookingForm({
   onBookingSubmit,
   isLoading = false,
 }: BookingFormProps) {
+  const { data: session } = useSession();
   const [userLocation, setUserLocation] = useState<string>("");
   const [isLocating, setIsLocating] = useState(false);
   const [locationError, setLocationError] = useState<string>("");
@@ -48,9 +50,24 @@ export function BookingForm({
     handleSubmit,
     formState: { errors },
     setValue,
+    // watch,
   } = useForm<BookingFormData>({
     resolver: zodResolver(bookingSchema),
   });
+
+  // Pré-remplir les champs avec les informations de la session
+  useEffect(() => {
+    if (session?.user) {
+      // Pré-remplir le nom si disponible
+      if (session.user.name) {
+        setValue("name", session.user.name);
+      }
+
+      // Pré-remplir le téléphone si disponible dans la session
+      // Note: Le téléphone n'est pas automatiquement inclus dans la session NextAuth
+      // Il faudrait l'ajouter dans les callbacks de NextAuth si nécessaire
+    }
+  }, [session, setValue]);
 
   // Géolocalisation automatique au chargement
   useEffect(() => {
@@ -135,6 +152,11 @@ export function BookingForm({
     });
   };
 
+  // Si l'utilisateur est connecté, utiliser ses informations de session
+  const isLoggedIn = !!session?.user;
+  const userName = session?.user?.name || "";
+  const userPhone = session?.user?.phone || ""; // Si le téléphone est dans la session
+
   return (
     <Card className="w-full max-w-md">
       <CardHeader>
@@ -142,11 +164,18 @@ export function BookingForm({
           <Search className="h-5 w-5" />
           Réserver un trajet
         </CardTitle>
+        {isLoggedIn && (
+          <p className="text-sm text-gray-600">
+            Connecté en tant que {userName}
+          </p>
+        )}
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Nom complet</Label>
+            <Label htmlFor="name">
+              Nom complet {isLoggedIn && "(pré-rempli)"}
+            </Label>
             <div className="relative">
               <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <Input
@@ -154,6 +183,8 @@ export function BookingForm({
                 {...register("name")}
                 placeholder="Votre nom"
                 className="pl-10"
+                defaultValue={isLoggedIn ? userName : ""}
+                disabled={isLoggedIn && !!userName}
               />
             </div>
             {errors.name && (
@@ -162,7 +193,9 @@ export function BookingForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="phone">Numéro de téléphone</Label>
+            <Label htmlFor="phone">
+              Numéro de téléphone {isLoggedIn && userPhone && "(pré-rempli)"}
+            </Label>
             <div className="relative">
               <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <Input
@@ -170,6 +203,8 @@ export function BookingForm({
                 {...register("phone")}
                 placeholder="Votre numéro"
                 className="pl-10"
+                defaultValue={isLoggedIn ? userPhone : ""}
+                disabled={isLoggedIn && !!userPhone}
               />
             </div>
             {errors.phone && (
